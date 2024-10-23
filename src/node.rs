@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
 use std::ptr::NonNull;
+use std::slice::SliceIndex;
 
 pub const CAPACITY: usize = 2 * 6 - 1;
 
@@ -37,38 +38,6 @@ impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
             node: NonNull::from(Box::leak(leaf)),
             _marker: PhantomData,
         }
-    }
-
-    pub fn new_internal<A: Allocator + Clone>(child: Root<K, O, V>, alloc: A) -> Self {
-        let mut new_node = unsafe { InternalNode::new(alloc) };
-        new_node.edges[0].write(child.node);
-        unsafe { NodeRef::from_new_internal(new_node, NonZero::new(child.height + 1).unwrap()) }
-    }
-
-    unsafe fn from_new_internal<A: Allocator + Clone>(
-        internal: Box<InternalNode<K, O, V>, A>,
-        height: NonZero<usize>,
-    ) -> Self {
-        let node = NonNull::from(Box::leak(internal)).cast();
-        let mut this = NodeRef {
-            height: height.into(),
-            node,
-            _marker: PhantomData,
-        };
-        this.borrow_mut().correct_all_childrens_parent_links();
-        this
-    }
-
-    fn correct_all_childrens_parent_links(&mut self) {
-        let len = self.len();
-        unsafe { self.correct_childrens_parent_links(0..=len) }
-    }
-
-    unsafe fn correct_childrens_parent_links<I: Iterator<Item = usize>>(&mut self, range: I) {
-        range.for_each(|i| {
-            assert!(i <= self.len());
-            unsafe { Handle::new_edge(self.reborrow_mut(), i) }.correct_parent_link();
-        });
     }
 
     pub fn forget_type(self) -> NodeRef<B, K, O, V, T> {
@@ -108,9 +77,9 @@ impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
     }
 }
 
-impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
+impl<B, K, O, V> NodeRef<B, K, O, V, LeafOrInternal> {
     pub fn last_leaf_edge(self) -> Handle<NodeRef<B, K, O, V, Leaf>, Edge> {
-        let node = self;
+        let mut node = self;
         loop {
             match node.force() {
                 ForceResult::Leaf(leaf) => return leaf.last_edge(),
@@ -120,16 +89,130 @@ impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
             }
         }
     }
-
+}
+impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
     pub fn last_edge(self) -> Handle<Self, Edge> {
         let len = self.len();
         unsafe { Handle::new_edge(self, len) }
     }
 }
 
+impl<'a, K: 'a, O: 'a, V: 'a, T> NodeRef<Mut<'a>, K, O, V, T> {
+    unsafe fn reborrow_mut(&mut self) -> Self {
+        NodeRef {
+            height: self.height,
+            node: self.node,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, K: 'a, O: 'a, V: 'a> NodeRef<Mut<'a>, K, O, V, Internal> {
+    fn correct_all_childrens_parent_links(&mut self) {
+        let len = self.len();
+        unsafe { self.correct_childrens_parent_links(0..=len) };
+    }
+
+    unsafe fn correct_childrens_parent_links<I: Iterator<Item = usize>>(&mut self, range: I) {
+        for i in range {
+            assert!(i <= self.len());
+            unsafe { Handle::new_edge(self.reborrow_mut(), i) }.correct_parent_link();
+        }
+    }
+}
+
+impl<'a, K: 'a, O: 'a, V: 'a> NodeRef<Mut<'a>, K, O, V, Leaf> {
+    pub fn push(&mut self, key: K, cokey: O, val: V) -> *mut V {
+        unsafe { self.push_with_handle(key, cokey, val).into_val_mut() }
+    }
+
+    pub unsafe fn push_with_handle<'b>(
+        &mut self,
+        key: K,
+        cokey: O,
+        val: V,
+    ) -> Handle<NodeRef<Mut<'b>, K, O, V, Leaf>, KOV> {
+        let len = self.len_mut();
+        let idx = usize::from(*len);
+        assert!(idx < CAPACITY);
+        *len += 1;
+        unsafe {
+            self.key_area_mut(idx).write((key, cokey));
+            self.val_area_mut(idx).write(val);
+            Handle::new_kov(
+                NodeRef {
+                    height: self.height,
+                    node: self.node,
+                    _marker: PhantomData,
+                },
+                idx,
+            )
+        }
+    }
+}
+
+impl<'a, K, O, V, T> NodeRef<Mut<'a>, K, O, V, T> {
+    pub fn len_mut(&mut self) -> &mut u16 {
+        &mut self.as_leaf_mut().len
+    }
+
+    pub fn key_area_mut<I, Op: ?Sized>(&mut self, index: I) -> &mut Op
+    where
+        I: SliceIndex<[MaybeUninit<(K, O)>], Output = Op>,
+    {
+        unsafe {
+            self.as_leaf_mut()
+                .keys
+                .as_mut_slice()
+                .get_unchecked_mut(index)
+        }
+    }
+
+    pub fn val_area_mut<I, Va: ?Sized>(&mut self, index: I) -> &mut Va
+    where
+        I: SliceIndex<[MaybeUninit<V>], Output = Va>,
+    {
+        unsafe {
+            self.as_leaf_mut()
+                .vals
+                .as_mut_slice()
+                .get_unchecked_mut(index)
+        }
+    }
+
+    fn as_leaf_mut(&mut self) -> &mut LeafNode<K, O, V> {
+        let ptr = Self::as_leaf_ptr(self);
+        unsafe { &mut *ptr }
+    }
+
+    fn into_leaf_mut(mut self) -> &'a mut LeafNode<K, O, V> {
+        let ptr = Self::as_leaf_ptr(&mut self);
+        unsafe { &mut *ptr }
+    }
+}
+
+impl<'a, K: 'a, O: 'a, V: 'a> NodeRef<Mut<'a>, K, O, V, LeafOrInternal> {
+    fn set_parent_link(&mut self, parent: NonNull<InternalNode<K, O, V>>, parent_idx: usize) {
+        let leaf = Self::as_leaf_ptr(self);
+        unsafe {
+            (*leaf).parent = Some(parent);
+            (*leaf).parent_idx.write(parent_idx as u16);
+        }
+    }
+}
+
 impl<B, K, O, V> NodeRef<B, K, O, V, Internal> {
     fn as_internal_ptr(this: &Self) -> *mut InternalNode<K, O, V> {
         this.node.as_ptr() as *mut InternalNode<K, O, V>
+    }
+
+    fn from_internal(node: NonNull<InternalNode<K, O, V>>, height: usize) -> Self {
+        assert!(height > 0);
+        NodeRef {
+            height,
+            node: node.cast(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -142,14 +225,14 @@ impl<K, O, V> Root<K, O, V> {
         let mut cur_node = self.borrow_mut().last_leaf_edge().node;
         iter.for_each(|(key, cokey, value)| {
             if cur_node.len() < CAPACITY {
-                cur_node.push(key, value);
+                cur_node.push(key, cokey, value);
             } else {
                 let mut open_node;
                 let mut test_node = cur_node.forget_type();
                 loop {
                     match test_node.ascend() {
                         Ok(parent) => {
-                            let parent = parent.into_node();
+                            let parent = parent.node;
                             if parent.len() < CAPACITY {
                                 open_node = parent;
                                 break;
@@ -166,8 +249,40 @@ impl<K, O, V> Root<K, O, V> {
             }
         });
     }
+}
+
+impl<K, O, V> NodeRef<Owned, K, O, V, Internal> {
+    unsafe fn from_new_internal<A: Allocator + Clone>(
+        internal: Box<InternalNode<K, O, V>, A>,
+        height: NonZero<usize>,
+    ) -> Self {
+        let node = NonNull::from(Box::leak(internal)).cast();
+        let mut this = NodeRef {
+            height: height.into(),
+            node,
+            _marker: PhantomData,
+        };
+        this.borrow_mut().correct_all_childrens_parent_links();
+
+        this
+    }
+
+    fn new_internal<A: Allocator + Clone>(child: Root<K, O, V>, alloc: A) -> Self {
+        let mut new_node = unsafe { InternalNode::new(alloc) };
+        new_node.edges[0].write(child.node);
+        unsafe { NodeRef::from_new_internal(new_node, NonZero::new(child.height + 1).unwrap()) }
+    }
 
     pub fn push_internal_level<A: Allocator + Clone>(
+        &mut self,
+        alloc: A,
+    ) -> NodeRef<Mut<'_>, K, O, V, Internal> {
+        replace(self, |old_r| {
+            NodeRef::new_internal(old_r, alloc).forget_type()
+        })
+    }
+
+    pub fn ppush_internal_level<A: Allocator + Clone>(
         &mut self,
         alloc: A,
     ) -> NodeRef<Mut<'_>, K, O, V, Internal> {
@@ -175,6 +290,16 @@ impl<K, O, V> Root<K, O, V> {
             NodeRef::new_internal(old_r, alloc).forget_type()
         });
 
+        NodeRef {
+            height: self.height,
+            node: self.node,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<K, O, V, T> NodeRef<Owned, K, O, V, T> {
+    pub fn borrow_mut(&mut self) -> NodeRef<Mut<'_>, K, O, V, T> {
         NodeRef {
             height: self.height,
             node: self.node,
@@ -263,8 +388,11 @@ impl<N, T> Handle<N, T> {
     }
 }
 
-impl<B, K, O, V, T, H> Handle<NodeRef<B, K, O, V, T>, H> {
-    pub unsafe fn new_edge(node: NodeRef<B, K, O, V, T>, idx: usize) -> Self {
+impl<B, K, O, V, T> Handle<NodeRef<B, K, O, V, T>, Edge> {
+    pub unsafe fn new_edge(
+        node: NodeRef<B, K, O, V, T>,
+        idx: usize,
+    ) -> Handle<NodeRef<B, K, O, V, T>, Edge> {
         assert!(idx <= node.len());
         Handle {
             node,
@@ -272,7 +400,38 @@ impl<B, K, O, V, T, H> Handle<NodeRef<B, K, O, V, T>, H> {
             _marker: PhantomData,
         }
     }
+}
 
+impl<'a, K: 'a, O: 'a, V: 'a, T> Handle<NodeRef<Mut<'a>, K, O, V, T>, KOV> {
+    pub fn into_val_mut(self) -> &'a mut V {
+        assert!(self.idx < self.node.len());
+        let leaf = self.node.into_leaf_mut();
+        unsafe { leaf.vals.get_unchecked_mut(self.idx).assume_init_mut() }
+    }
+}
+
+impl<'a, K, O, V> Handle<NodeRef<Mut<'a>, K, O, V, Internal>, Edge> {
+    fn correct_parent_link(self) {
+        let ptr = unsafe { NonNull::new_unchecked(NodeRef::as_internal_ptr(&self.node)) };
+        let idx = self.idx;
+        let mut child = self.descend();
+        child.set_parent_link(ptr, idx);
+    }
+}
+
+impl<T, B, K, O, V> Handle<NodeRef<B, K, O, V, Leaf>, T> {
+    pub fn force(
+        self,
+    ) -> ForceResult<Handle<NodeRef<B, K, O, V, Leaf>, T>, Handle<NodeRef<B, K, O, V, Internal>, T>>
+    {
+        match self.node.force() {
+            ForceResult::Leaf(node) => ForceResult::Leaf(Handle::new(node, self.idx)),
+            ForceResult::Internal(node) => ForceResult::Internal(Handle::new(node, self.idx)),
+        }
+    }
+}
+
+impl<B, K, O, V> Handle<NodeRef<B, K, O, V, Internal>, Edge> {
     pub fn descend(self) -> NodeRef<B, K, O, V, LeafOrInternal> {
         let parent_ptr = NodeRef::as_internal_ptr(&self.node);
         let node = unsafe {
@@ -289,14 +448,14 @@ impl<B, K, O, V, T, H> Handle<NodeRef<B, K, O, V, T>, H> {
     }
 }
 
-impl<T, B, K, O, V> Handle<NodeRef<B, K, O, V, Leaf>, T> {
-    pub fn force(
-        self,
-    ) -> ForceResult<Handle<NodeRef<B, K, O, V, Leaf>, T>, Handle<NodeRef<B, K, O, V, Internal>, T>>
-    {
-        match self.node.force() {
-            ForceResult::Leaf(node) => ForceResult::Leaf(Handle::new(node, self.idx)),
-            ForceResult::Internal(node) => ForceResult::Internal(Handle::new(node, self.idx)),
+impl<'a, B, K, O, V: 'a, T> Handle<NodeRef<B, K, O, V, T>, KOV> {
+    pub unsafe fn new_kov(node: NodeRef<B, K, O, V, T>, idx: usize) -> Self {
+        assert!(idx < node.len());
+
+        Handle {
+            node,
+            idx,
+            _marker: PhantomData,
         }
     }
 }
@@ -309,6 +468,7 @@ pub enum LeafOrInternal {}
 pub enum Internal {}
 pub enum Leaf {}
 pub enum Edge {}
+pub enum KOV {}
 
 pub enum ForceResult<L, I> {
     Leaf(L),
