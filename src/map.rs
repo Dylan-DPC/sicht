@@ -56,7 +56,9 @@ where
             DedupSortedIter::new(iter.into_iter()),
             &mut length,
             alloc.clone(),
-        )
+        );
+
+        SichtMap { root: Some(root), length, alloc: ManuallyDrop::new(alloc), _marker: PhantomData}
     }
 }
 

@@ -4,6 +4,7 @@
 mod iter;
 pub mod map;
 mod node;
+mod fix;
 
 pub use crate::map::{SichtMap, SichtSet};
 

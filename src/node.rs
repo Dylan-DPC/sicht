@@ -1,5 +1,4 @@
 use std::alloc::Allocator;
-use std::borrow::BorrowMut;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::num::NonZero;
@@ -48,6 +47,14 @@ impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
         }
     }
 
+    pub fn forget_me_type(self) -> NodeRef<B, K, O, V, Internal> {
+        NodeRef {
+            height: self.height,
+            node: self.node,
+            _marker: PhantomData
+        }
+    }
+
     pub fn force(self) -> ForceResult<NodeRef<B, K, O, V, Leaf>, NodeRef<B, K, O, V, Internal>> {
         if self.height == 0 {
             ForceResult::Leaf(NodeRef {
@@ -77,7 +84,7 @@ impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
     }
 }
 
-impl<B, K, O, V> NodeRef<B, K, O, V, LeafOrInternal> {
+impl<B, K, O, V, T> NodeRef<B, K, O, V, T> {
     pub fn last_leaf_edge(self) -> Handle<NodeRef<B, K, O, V, Leaf>, Edge> {
         let mut node = self;
         loop {
@@ -122,6 +129,7 @@ impl<'a, K: 'a, O: 'a, V: 'a> NodeRef<Mut<'a>, K, O, V, Internal> {
 }
 
 impl<'a, K: 'a, O: 'a, V: 'a> NodeRef<Mut<'a>, K, O, V, Leaf> {
+
     pub fn push(&mut self, key: K, cokey: O, val: V) -> *mut V {
         unsafe { self.push_with_handle(key, cokey, val).into_val_mut() }
     }
@@ -216,23 +224,56 @@ impl<B, K, O, V> NodeRef<B, K, O, V, Internal> {
     }
 }
 
+impl<'a, K: 'a, O:'a, V:'a> NodeRef<Mut<'a>, K, O, V, Internal> {
+    fn push(&mut self, key: K, cokey: O, val: V, edge: Root<K, O, V>) {
+        assert!(edge.height == self.height - 1);
+        let len = self.len_mut();
+        let idx = usize::from(*len);
+        assert!(idx < CAPACITY);
+        *len += 1;
+        unsafe {
+            self.key_area_mut(idx).write((key, cokey));
+            self.val_area_mut(idx).write(val);
+            self.edge_area_mut(idx + 1).write(edge.node);
+            Handle::new_edge(self.reborrow_mut(), idx + 1).correct_parent_link();
+        }
+
+    }
+
+    fn edge_area_mut<I, Op: ?Sized>(&mut self, index: I) -> &mut Op 
+        where
+            I: SliceIndex<[MaybeUninit<BoxedNode<K, O, V>>], Output=Op>
+    {
+        unsafe {
+            self.as_internal_mut().edges.as_mut_slice().get_unchecked_mut(index)
+        }
+    }
+
+    fn as_internal_mut(&mut self) -> &mut InternalNode<K, O, V> {
+        let ptr = Self::as_internal_ptr(self);
+        unsafe { &mut *ptr }
+    }
+}
+
+type BoxedNode<K, O, V> = NonNull<LeafNode<K, O, V>>;
+
 impl<K, O, V> Root<K, O, V> {
-    pub fn bulk_push<I, A>(&mut self, iter: I, length: &mut usize, alloc: A) -> Self
+    pub fn bulk_push<I, A>(&mut self, iter: I, length: &mut usize, alloc: A)  
     where
         I: Iterator<Item = (K, O, V)>,
         A: Allocator + Clone,
     {
-        let mut cur_node = self.borrow_mut().last_leaf_edge().node;
-        iter.for_each(|(key, cokey, value)| {
+        let mut cur_node: NodeRef<Mut<'_>, _, _, _, Leaf> = self.borrow_mut().last_leaf_edge().into_node();
+        for (key, cokey, value) in iter {
             if cur_node.len() < CAPACITY {
                 cur_node.push(key, cokey, value);
             } else {
-                let mut open_node;
-                let mut test_node = cur_node.forget_type();
+                let mut open_node: NodeRef<_, _, _, _, Internal>;
+                let mut test_node = cur_node.forget_me_type();
                 loop {
                     match test_node.ascend() {
                         Ok(parent) => {
-                            let parent = parent.node;
+                            let parent: NodeRef<Mut<'_>, _, _, _, Internal> = parent.into_node();
                             if parent.len() < CAPACITY {
                                 open_node = parent;
                                 break;
@@ -246,9 +287,21 @@ impl<K, O, V> Root<K, O, V> {
                         }
                     }
                 }
+                let tree_height = open_node.height - 1;
+                let mut right_tree = Root::new(alloc.clone());
+                (0..tree_height).for_each(|_| {
+                    right_tree.push_internal_level(alloc.clone());
+                });
+                open_node.push(key, cokey, value, right_tree);
+                cur_node = open_node.forget_type().last_leaf_edge().into_node();
             }
-        });
+            *length += 1;
+        }
+        self.fix_right_border_of_plentiful();
     }
+
+    
+
 }
 
 impl<K, O, V> NodeRef<Owned, K, O, V, Internal> {
@@ -272,21 +325,37 @@ impl<K, O, V> NodeRef<Owned, K, O, V, Internal> {
         new_node.edges[0].write(child.node);
         unsafe { NodeRef::from_new_internal(new_node, NonZero::new(child.height + 1).unwrap()) }
     }
+}
 
-    pub fn push_internal_level<A: Allocator + Clone>(
-        &mut self,
-        alloc: A,
-    ) -> NodeRef<Mut<'_>, K, O, V, Internal> {
-        replace(self, |old_r| {
-            NodeRef::new_internal(old_r, alloc).forget_type()
-        })
-    }
+impl<K, O, V> NodeRef<Owned, K, O, V, LeafOrInternal> {
 
     pub fn ppush_internal_level<A: Allocator + Clone>(
         &mut self,
         alloc: A,
     ) -> NodeRef<Mut<'_>, K, O, V, Internal> {
-        take_mut(self, |old_r| {
+        struct PanicGuard;
+        impl Drop for PanicGuard {
+            fn drop(&mut self) {
+                std::process::abort()
+            }
+        }
+
+        let guard = PanicGuard;
+        let value = unsafe { std::ptr::read(self) };
+            let new_value  = NodeRef::new_internal(value, alloc).forget_type();
+            unsafe {
+                std::ptr::write(self, new_value);
+            }
+            std::mem::forget(guard);
+
+
+    }
+
+    pub fn push_internal_level<A: Allocator + Clone>(
+        &mut self,
+        alloc: A,
+    ) -> NodeRef<Mut<'_>, K, O, V, Internal> {
+        take_mut(self, |old_r: NodeRef<Owned,  _, _, _, Internal>|{
             NodeRef::new_internal(old_r, alloc).forget_type()
         });
 
@@ -386,6 +455,10 @@ impl<N, T> Handle<N, T> {
             _marker: PhantomData,
         }
     }
+
+    pub fn into_node(self) -> N {
+        self.node
+    }
 }
 
 impl<B, K, O, V, T> Handle<NodeRef<B, K, O, V, T>, Edge> {
@@ -419,7 +492,7 @@ impl<'a, K, O, V> Handle<NodeRef<Mut<'a>, K, O, V, Internal>, Edge> {
     }
 }
 
-impl<T, B, K, O, V> Handle<NodeRef<B, K, O, V, Leaf>, T> {
+impl<T, B, K, O, V> Handle<NodeRef<B, K, O, V, LeafOrInternal>, T> {
     pub fn force(
         self,
     ) -> ForceResult<Handle<NodeRef<B, K, O, V, Leaf>, T>, Handle<NodeRef<B, K, O, V, Internal>, T>>
@@ -476,3 +549,5 @@ pub enum ForceResult<L, I> {
 }
 
 pub struct Mut<'a>(PhantomData<&'a mut ()>);
+
+
