@@ -1,68 +1,49 @@
-use crate::iter::DedupSortedIter;
-use crate::node::Root;
 use std::alloc::{Allocator, Global};
-use std::borrow::Borrow;
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
+use std::collections::BTreeMap;
+use crate::selector::Oder;
 
-pub struct SichtSet<K, O, A = Global>
+pub struct SichtMap<'a, K, O, V, A = Global> 
 where
     K: Ord,
     O: Ord,
     A: Allocator + Clone,
 {
-    map: SichtMap<K, O, (), A>,
+    map: BTreeMap<Oder<'a, K, O>, V, A>
 }
 
-pub struct SichtMap<K, O, V, A = Global>
+pub struct SichtSet<'a, K, O, A = Global>
 where
     K: Ord,
     O: Ord,
     A: Allocator + Clone,
 {
-    root: Option<Root<K, O, V>>,
-    length: usize,
-    alloc: ManuallyDrop<A>,
-    _marker: PhantomData<Box<(K, O, V), A>>,
+    map: SichtMap<'a, K, O, (), A>,
 }
 
-impl<K, O, V, A> SichtMap<K, O, V, A>
+
+impl<'a, K, O, V, A> SichtMap<'a, K, O, V, A>
 where
     K: Ord,
-    O: Ord,
+    O: Ord + Debug,
     A: Allocator + Clone,
 {
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    pub fn get(&'a self, key: &'a K) -> Option<&'a V>
     where
-        K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        K: PartialEq + Eq + PartialOrd + Ord,
     {
-        todo!()
+        self.map.get(&Oder::new_left(key)) 
     }
 
-    fn bulk_build_from_sorted_iter<I>(iter: I, alloc: A) -> Self
-    where
-        K: Ord,
-        I: IntoIterator<Item = (K, O, V)>,
-    {
-        let mut root = Root::new(alloc.clone());
-        let mut length = 0;
-        root.bulk_push(
-            DedupSortedIter::new(iter.into_iter()),
-            &mut length,
-            alloc.clone(),
-        );
-
-        SichtMap { root: Some(root), length, alloc: ManuallyDrop::new(alloc), _marker: PhantomData}
-    }
+            
+    
 }
 
-impl<K, O, V, A> Debug for SichtMap<K, O, V, A>
+impl<'a, K, O, V, A> Debug for SichtMap<'a, K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -73,7 +54,7 @@ where
     }
 }
 
-impl<K: Ord, O, V, A> Clone for SichtMap<K, O, V, A>
+impl<'a, K: Ord, O, V, A> Clone for SichtMap<'a, K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -83,7 +64,7 @@ where
         todo!()
     }
 }
-impl<K, O, V, A: Allocator + Clone> Default for SichtMap<K, O, V, A>
+impl<'a, K, O, V, A: Allocator + Clone> Default for SichtMap<'a, K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -94,7 +75,7 @@ where
     }
 }
 
-impl<K: Ord, O, V, A: Allocator + Clone> FromIterator<(K, O, V)> for SichtMap<K, O, V, A>
+impl<'a, K: Ord, O, V, A: Allocator + Clone> FromIterator<(K, O, V)> for SichtMap<'a, K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -104,12 +85,6 @@ where
     where
         T: IntoIterator<Item = (K, O, V)>,
     {
-        let mut inputs: Vec<_> = iter.into_iter().collect();
-        if inputs.is_empty() {
-            Self::new()
-        } else {
-            inputs.sort_by(|a, b| a.0.cmp(&b.0));
-            Self::bulk_build_from_sorted_iter(inputs, Global)
-        }
+       todo!() 
     }
 }
