@@ -2,7 +2,7 @@
 #![deny(clippy::pedantic, clippy::dbg_macro)]
 #![feature(allocator_api)]
 pub mod map;
-mod selector;
+pub mod selector;
 
 pub use crate::map::{SichtMap, SichtSet};
 

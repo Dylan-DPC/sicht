@@ -1,49 +1,62 @@
-use std::alloc::{Allocator, Global};
-use std::fmt::{Debug, Formatter};
-use std::collections::BTreeMap;
 use crate::selector::Oder;
+use std::alloc::{Allocator, Global};
+use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
 
-pub struct SichtMap<'a, K, O, V, A = Global> 
+pub struct SichtMap<K, O, V, A = Global>
 where
     K: Ord,
     O: Ord,
     A: Allocator + Clone,
 {
-    map: BTreeMap<Oder<'a, K, O>, V, A>
+    map: BTreeMap<Oder<K, O>, V, A>,
 }
 
-pub struct SichtSet<'a, K, O, A = Global>
+pub struct SichtSet<K, O, A = Global>
 where
     K: Ord,
     O: Ord,
     A: Allocator + Clone,
 {
-    map: SichtMap<'a, K, O, (), A>,
+    map: SichtMap<K, O, (), A>,
 }
 
-
-impl<'a, K, O, V, A> SichtMap<'a, K, O, V, A>
+impl<K, O, V, A> SichtMap<K, O, V, A>
 where
     K: Ord,
     O: Ord + Debug,
     A: Allocator + Clone,
 {
+    #[must_use]
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn get(&'a self, key: &'a K) -> Option<&'a V>
+    pub fn get(&self, key: K) -> Option<&V>
     where
         K: PartialEq + Eq + PartialOrd + Ord,
     {
-        self.map.get(&Oder::new_left(key)) 
+        self.map.get(&Oder::new_left(key))
     }
 
-            
-    
+    pub fn get_with_outer_key(&self, key: &Oder<K, O>) -> Option<&V> {
+        self.map.get(key)
+    }
+
+    pub fn get_with_outer_key_mut(&mut self, key: &Oder<K, O>) -> Option<&mut V> {
+        self.map.get_mut(key)
+    }
+
+    pub fn insert_with_both_keys(&mut self, key: K, cokey: O, value: V) {
+        self.map.insert(Oder::new(key, cokey), value);
+    }
+
+    pub fn insert_with_cokey(&mut self, cokey: O, value: V) {
+        self.map.insert(Oder::new_right(cokey), value);
+    }
 }
 
-impl<'a, K, O, V, A> Debug for SichtMap<'a, K, O, V, A>
+impl<K, O, V, A> Debug for SichtMap<K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -54,7 +67,7 @@ where
     }
 }
 
-impl<'a, K: Ord, O, V, A> Clone for SichtMap<'a, K, O, V, A>
+impl<K: Ord, O, V, A> Clone for SichtMap<K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -64,7 +77,7 @@ where
         todo!()
     }
 }
-impl<'a, K, O, V, A: Allocator + Clone> Default for SichtMap<'a, K, O, V, A>
+impl<K, O, V, A: Allocator + Clone> Default for SichtMap<K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -75,7 +88,7 @@ where
     }
 }
 
-impl<'a, K: Ord, O, V, A: Allocator + Clone> FromIterator<(K, O, V)> for SichtMap<'a, K, O, V, A>
+impl<K: Ord, O, V, A: Allocator + Clone> FromIterator<(K, O, V)> for SichtMap<K, O, V, A>
 where
     K: Ord,
     O: Ord,
@@ -85,6 +98,6 @@ where
     where
         T: IntoIterator<Item = (K, O, V)>,
     {
-       todo!() 
+        todo!()
     }
 }
