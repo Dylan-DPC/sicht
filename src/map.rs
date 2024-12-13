@@ -1,6 +1,6 @@
 use crate::selector::Oder;
 use std::alloc::{Allocator, Global};
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Iter, BTreeMap};
 use std::fmt::{Debug, Formatter};
 
 pub struct SichtMap<K, O, V, A = Global>
@@ -21,17 +21,25 @@ where
     map: SichtMap<K, O, (), A>,
 }
 
+impl<K, O, V> SichtMap<K, O, V>
+where
+    K: Ord,
+    O: Ord,
+{
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            map: BTreeMap::new(),
+        }
+    }
+}
+
 impl<K, O, V, A> SichtMap<K, O, V, A>
 where
     K: Ord,
-    O: Ord + Debug,
+    O: Ord,
     A: Allocator + Clone,
 {
-    #[must_use]
-    pub fn new() -> Self {
-        todo!()
-    }
-
     pub fn get(&self, key: K) -> Option<&V>
     where
         K: PartialEq + Eq + PartialOrd + Ord,
@@ -54,50 +62,56 @@ where
     pub fn insert_with_cokey(&mut self, cokey: O, value: V) {
         self.map.insert(Oder::new_right(cokey), value);
     }
+
+    pub fn iter(&self) -> Iter<'_, Oder<K, O>, V> {
+        self.map.iter()
+    }
 }
 
 impl<K, O, V, A> Debug for SichtMap<K, O, V, A>
 where
-    K: Ord,
-    O: Ord,
+    K: Ord + Debug,
+    O: Ord + Debug,
+    V: Debug,
     A: Allocator + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        f.debug_map().entries(self.iter()).finish()
     }
 }
 
 impl<K: Ord, O, V, A> Clone for SichtMap<K, O, V, A>
 where
-    K: Ord,
-    O: Ord,
+    K: Ord + Clone,
+    O: Ord + Clone,
+    V: Clone,
     A: Allocator + Clone,
 {
     fn clone(&self) -> Self {
         todo!()
     }
 }
-impl<K, O, V, A: Allocator + Clone> Default for SichtMap<K, O, V, A>
+impl<K, O, V> Default for SichtMap<K, O, V>
 where
-    K: Ord,
-    O: Ord,
-    A: Allocator + Clone,
+    K: Ord + Default,
+    O: Ord + Default,
+    V: Default,
 {
     fn default() -> Self {
-        todo!()
+        SichtMap::new()
     }
 }
 
-impl<K: Ord, O, V, A: Allocator + Clone> FromIterator<(K, O, V)> for SichtMap<K, O, V, A>
+impl<K, O, V> FromIterator<(Oder<K, O>, V)> for SichtMap<K, O, V>
 where
     K: Ord,
     O: Ord,
-    A: Allocator + Clone,
 {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (K, O, V)>,
+        T: IntoIterator<Item = (Oder<K, O>, V)>,
     {
-        todo!()
+        let map = BTreeMap::from_iter(iter);
+        SichtMap { map: map }
     }
 }

@@ -1,18 +1,17 @@
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Oder<E, D>
 where
-    E: PartialOrd + Ord,
-    D: PartialOrd + Ord,
+    E: Ord,
+    D: Ord,
 {
-    left: Option<E>,
-    right: Option<D>,
+    pub left: Option<E>,
+    pub right: Option<D>,
 }
 
 impl<E, D> Oder<E, D>
 where
-    E: PartialOrd + Ord,
-    D: PartialOrd + Ord,
+    E: Ord,
+    D: Ord,
 {
     pub fn new(left: E, right: D) -> Self {
         Self {

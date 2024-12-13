@@ -1,6 +1,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::pedantic, clippy::dbg_macro)]
 #![feature(allocator_api)]
+pub mod iter;
 pub mod map;
 pub mod selector;
 
