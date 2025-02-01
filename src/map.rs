@@ -47,14 +47,25 @@ where
         self.map.get(&Oder::new_left(key))
     }
 
-    pub fn get_with_outer_key(&self, key: &Oder<K, O>) -> Option<&V> {
+    pub fn get_with_outer_key(&self, key: &O) -> Option<&V> {
+        self.map.iter().find(|(Oder { left: _, right: r}, _)| {
+            matches!(r, Some(k) if k == key)
+        }).map(|(_, v)| v)
+    }
+
+    pub fn get_with_outer_key_mut(&mut self, key: &O) -> Option<&mut V> {
+        self.map.iter_mut().find(|(Oder { left: _, right: r}, _)| {
+            matches!(r, Some(k) if k == key)
+        }).map(|(_, v)| v)
+    }       
+
+    pub fn get_with_both_keys(&mut self, key: &Oder<K, O>) -> Option<&V> {
         self.map.get(key)
     }
 
-    pub fn get_with_outer_key_mut(&mut self, key: &Oder<K, O>) -> Option<&mut V> {
+    pub fn get_with_both_keys_mut(&mut self, key: &Oder<K, O>) -> Option<&mut V> {
         self.map.get_mut(key)
     }
-
     pub fn insert_with_both_keys(&mut self, key: K, cokey: O, value: V) {
         self.map.insert(Oder::new(key, cokey), value);
     }
@@ -65,6 +76,10 @@ where
 
     pub fn iter(&self) -> Iter<'_, Oder<K, O>, V> {
         self.map.iter()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }
 
