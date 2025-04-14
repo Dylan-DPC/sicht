@@ -1,4 +1,5 @@
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+use serde::{Serialize, Deserialize};
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Oder<E, D>
 where
     E: Ord,
@@ -29,10 +30,26 @@ where
 
     pub fn new_right(right: D) -> Self {
         Self {
-            left: None,
+            left : None,
             right: Some(right),
         }
     }
 }
-
-
+/*
+impl<'de, E, D> Deserialize<'de> for Oder<E, D> {
+where
+    E: Deserialize<'de> + Ord,
+    D: Deserialize<'de> + Ord,
+  {
+      fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> 
+        where
+            D: Deserializer<'de>
+      {
+          Ok(Self { 
+            left: E::deserialize(deserializer),
+            right: D::deserialize(deserializer),
+          })
+      }
+  }
+}
+*/

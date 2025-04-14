@@ -2,6 +2,7 @@ use crate::selector::Oder;
 use std::alloc::{Allocator, Global};
 use std::collections::{btree_map::Iter, BTreeMap};
 use std::fmt::{Debug, Formatter};
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
 pub struct SichtMap<K, O, V, A = Global>
 where
@@ -40,12 +41,14 @@ where
     O: Ord,
     A: Allocator + Clone,
 {
-    pub fn get(&self, key: K) -> Option<&V>
-    where
-        K: PartialEq + Eq + PartialOrd + Ord,
-    {
-        self.map.get(&Oder::new_left(key))
+
+     pub fn get_with_base_key(&self, key: &K) -> Option<&V> {
+        self.map.iter().find(|(Oder { left: l, right: _}, _)| {
+            matches!(l, Some(k) if k == key)
+        }).map(|(_, v)| v)
     }
+
+
 
     pub fn get_with_outer_key(&self, key: &O) -> Option<&V> {
         self.map.iter().find(|(Oder { left: _, right: r}, _)| {
@@ -110,7 +113,6 @@ impl<K, O, V> Default for SichtMap<K, O, V>
 where
     K: Ord + Default,
     O: Ord + Default,
-    V: Default,
 {
     fn default() -> Self {
         SichtMap::new()
@@ -130,3 +132,35 @@ where
         SichtMap { map: map }
     }
 }
+impl<K, O, V> Serialize for SichtMap<K, O, V> 
+where
+    K: Serialize + Ord,
+    O: Serialize + Ord,
+    V: Serialize
+  {
+      fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> 
+        where
+            S: Serializer
+      {
+          serializer.collect_map(self)
+
+      }
+  }
+
+impl<'de, K, O, V> Deserialize<'de> for SichtMap<K, O, V> 
+where
+    K: Deserialize<'de> + Ord,
+    O: Deserialize<'de> + Ord,
+    V: Deserialize<'de>
+  {
+      fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> 
+        where
+            D: Deserializer<'de>
+      {
+          let map: BTreeMap<Oder<K,O>, V> = BTreeMap::deserialize(deserializer)?;
+          Ok(Self { 
+              map
+          })
+      }
+  }
+
