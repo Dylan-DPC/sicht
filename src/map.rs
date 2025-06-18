@@ -45,7 +45,7 @@ where
     A: Allocator + Clone,
 {
 
-     pub fn get_with_base_key(&'a self, key: Cow<'a, K>) -> Option<&'a V> 
+     pub fn get_with_base_key(&'a self, key: Kuh<'a, K>) -> Option<&'a V> 
         where 
             K: 'a,
      {
@@ -76,7 +76,7 @@ where
         self.map.get_mut(key)
     }
     pub fn insert_with_both_keys(&mut self, key: &'a K, cokey: &'a O, value: V) {
-        self.map.insert(Oder::new(Cow::Borrowed(key), Cow::Borrowed(cokey)), value);
+        self.map.insert(Oder::new(Kuh::Borrowed(key), Kuh::Borrowed(cokey)), value);
     }
 
 
@@ -89,7 +89,7 @@ where
     }
 
 
-    pub fn contains_both_keys<Q, R>(&self, key: Cow<'_, K>, other: Cow<'_, O>) -> bool 
+    pub fn contains_both_keys<Q, R>(&self, key: Kuh<'_, K>, other: Kuh<'_, O>) -> bool 
         where
             K: AsRef<Q> + KuhnvertOwned<To: KuhnvertBorrowed<To = K>> + KuhnvertBorrowed<To = K>,
             O: AsRef<Q> + KuhnvertOwned<To: KuhnvertBorrowed<To = O>> + KuhnvertBorrowed<To = O>,
