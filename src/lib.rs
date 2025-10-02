@@ -5,7 +5,7 @@ pub mod iter;
 pub mod map;
 pub mod selector;
 
-pub use crate::map::{SichtMap, SichtSet};
+pub use crate::map::SichtMap;
 
 #[cfg(test)]
 mod tests {
