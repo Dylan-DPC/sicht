@@ -1,7 +1,6 @@
 use kuh::{Derow, Kuh};
 use serde::de::Visitor;
-use serde::ser::SerializeStruct;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
@@ -44,6 +43,10 @@ where
             left: None,
             right: Some(Kuh::Owned(right)),
         }
+    }
+
+    pub fn is_filled(&self) -> bool {
+        self.left.is_some() || self.right.is_some()
     }
 }
 
@@ -123,23 +126,6 @@ where
     }
 }
 
-impl<'a, E,D> Serialize for Oder<'a, E, D>
-where
-    E: Ord + Clone + Derow<'a> +Clone + Serialize,
-    D: Ord + Clone + Derow<'a> +Clone + Serialize,
-    <E as Derow<'a>>::Target: Serialize,
-    <D as Derow<'a>>::Target: Derow<'a> +Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Oder", 2)?;
-        state.serialize_field("left", &self.left)?;
-        state.serialize_field("right", &self.right)?;
-        state.end()
-    }
-}
 
 impl<'de, E, D> Deserialize<'de> for Oder<'de, E, D>
 where

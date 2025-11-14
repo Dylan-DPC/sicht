@@ -1,14 +1,14 @@
 use crate::selector::Oder;
 use kuh::{Derow, Kuh};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer};
 use std::alloc::{Allocator, Global};
 use std::collections::{btree_map::Iter, BTreeMap};
 use std::fmt::{Debug, Formatter};
 
 pub struct SichtMap<'a, K, O, V, A = Global>
 where
-    K: Ord + Derow<'a> + Clone,
-    O: Ord + Derow<'a> + Clone,
+    K: Ord + Derow<'a, Target: Ord> + Clone,
+    O: Ord + Derow<'a, Target: Ord> + Clone,
     A: Allocator + Clone,
 {
     pub(crate) map: BTreeMap<Oder<'a, K, O>, V, A>,
@@ -16,8 +16,8 @@ where
 
 impl<'a, K, O, V> SichtMap<'a, K, O, V>
 where
-    K: Ord + Derow<'a> + Clone,
-    O: Ord + Derow<'a> + Clone,
+    K: Ord + Derow<'a, Target: Ord> + Clone,
+    O: Ord + Derow<'a, Target: Ord> + Clone,
 {
     #[must_use]
     pub const fn new() -> Self {
@@ -29,29 +29,29 @@ where
 
 impl<'a, K, O, V, A> SichtMap<'a, K, O, V, A>
 where
-    K: Ord + Derow<'a, Target: Ord + PartialEq<K>> + Clone,
-    O: Ord + Derow<'a, Target: Ord + PartialEq<O>> + Clone,
+    K: Ord + Derow<'a, Target: Ord> + Clone,
+    O: Ord + Derow<'a, Target: Ord> + Clone,
 
     A: Allocator + Clone,
 {
-    pub fn get_with_base_key(&self, key: &K) -> Option<&V> {
+    pub fn get_with_base_key(&self, key: &Kuh<'a, K>) -> Option<&V> {
         self.map
             .iter()
-            .find(|(Oder { left: l, right: _ }, _)| matches!(l, Some(k) if k.derow() == key))
+            .find(|(Oder { left: l, right: _ }, _)| matches!(l, Some(k) if k == key))
             .map(|(_, v)| v)
     }
 
-    pub fn get_with_outer_key(&self, key: &O) -> Option<&V> {
+    pub fn get_with_outer_key(&self, key: Kuh<'a, O>) -> Option<&V> {
         self.map.iter().find(|(Oder { left: _, right: r}, _)| {
-            matches!(r, Some(k) if k.derow() == key)
+            matches!(r, Some(k) if *k == key)
         }).map(|(_, v)| v)
     }
 
-    pub fn get_with_outer_key_mut(&mut self, key: &'a O) -> Option<&mut V> {
+    pub fn get_with_outer_key_mut(&mut self, key: Kuh<'a, O>) -> Option<&mut V> {
         self.map
             .iter_mut()
             .find(
-                |(Oder { left: _, right: r }, _)| matches!(r, Some(k) if *k == Kuh::Borrowed(key.derow())),
+                |(Oder { left: _, right: r }, _)| matches!(r, Some(k) if *k == key)
             )
             .map(|(_, v)| v)
     }
@@ -95,36 +95,23 @@ where
 
 impl<'a, K, O, V, A> Clone for SichtMap<'a, K, O, V, A>
 where
-    K: Ord + Derow<'a, Target: Clone>  + Clone,
-    O: Ord + Derow<'a, Target: Clone>  + Clone,
+    K: Ord + Derow<'a, Target: Ord + PartialEq<K>>  + Clone,
+    O: Ord + Derow<'a, Target: Clone+ Ord + PartialEq<O>>+ Clone,
     V: Clone,
+    Oder<'a, K, O>: Clone,
     A: Allocator + Clone,
 {
     fn clone(&self) -> Self {
-        todo!()
+        Self { map: self.map.clone() }
     }
 }
 impl<'a, K, O, V> Default for SichtMap<'a, K, O, V>
 where
-    K: Ord + Derow<'a> + Clone + Default,
-    O: Ord + Derow<'a> + Clone + Default,
+    K: Ord + Derow<'a, Target: Ord> + Clone + Default,
+    O: Ord + Derow<'a, Target: Ord> + Clone + Default,
 {
     fn default() -> Self {
         SichtMap::new()
-    }
-}
-
-impl<'a, K, O, V> Serialize for SichtMap<'a, K, O, V>
-where
-    K: Serialize + Ord + Derow<'a, Target = K> + Clone,
-    O: Serialize + Ord + Derow<'a, Target = O> + Clone,
-    V: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.iter())
     }
 }
 
@@ -133,7 +120,6 @@ where
     K: Deserialize<'de> + Ord + Derow<'de, Target: Ord> + Clone + 'de,
     O: Deserialize<'de> + Ord + Derow<'de, Target: Ord> + Clone + 'de,
     V: Deserialize<'de>,
-    &'de <K as Derow<'de>>::Target: Derow<'de>
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
