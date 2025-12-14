@@ -1,30 +1,25 @@
-use kuh::{Derow, Kuh};
 use serde::de::Visitor;
 use serde::{Deserialize, Deserializer};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 
-pub struct Oder<'a, E, D>
+pub struct Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a>,
-    D: Ord + Clone + Derow<'a>,
+    E: Ord + Clone,
+    D: Ord + Clone,
 {
-    pub left: Option<Kuh<'a, E>>,
-    pub right: Option<Kuh<'a, D>>,
+    pub left: Option<E>,
+    pub right: Option<D>,
 }
 
-impl<'a, E, D> Oder<'a, E, D>
+impl<E, D> Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a>,
-    D: Ord + Clone + Derow<'a>,
+    E: Ord + Clone,
+    D: Ord + Clone,
 {
     
     pub fn new(left: E, right: D) -> Self {
-        Self::new_with_kuh(Kuh::Owned(left), Kuh::Owned(right))
-    }
-
-    pub fn new_with_kuh(left: Kuh<'a, E>, right: Kuh<'a, D>) -> Self {
         Self {
             left: Some(left),
             right: Some(right),
@@ -33,7 +28,7 @@ where
 
     pub fn new_left(left: E) -> Self {
         Self {
-            left: Some(Kuh::Owned(left)),
+            left: Some(left),
             right: None,
         }
     }
@@ -41,7 +36,7 @@ where
     pub fn new_right(right: D) -> Self {
         Self {
             left: None,
-            right: Some(Kuh::Owned(right)),
+            right: Some(right),
         }
     }
 
@@ -50,10 +45,10 @@ where
     }
 }
 
-impl<'a, E,D> Clone for Oder<'a, E, D>
+impl<E,D> Clone for Oder<E, D>
 where
-    E: Ord +  Derow<'a, Target: Clone> + Clone,
-    D: Ord + Derow<'a, Target: Clone> + Clone,
+    E: Ord + Clone,
+    D: Ord + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -63,10 +58,10 @@ where
     }
 }
 
-impl<'a, E,D> Debug for Oder<'a, E, D>
+impl<E,D> Debug for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a, Target: Debug + Ord> + Debug,
-    D: Ord + Clone + Derow<'a, Target: Debug + Ord> + Debug,
+    E: Ord + Clone + Debug,
+    D: Ord + Clone + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Oder")
@@ -76,10 +71,10 @@ where
     }
 }
 
-impl<'a, E,D> Default for Oder<'a, E, D>
+impl<E,D> Default for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a>,
-    D: Ord + Clone + Derow<'a>,
+    E: Ord + Clone,
+    D: Ord + Clone,
 {
     fn default() -> Self {
         Self {
@@ -89,26 +84,26 @@ where
     }
 }
 
-impl<'a, E,D> PartialEq for Oder<'a, E, D>
+impl<E,D> PartialEq for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a, Target: PartialEq> + PartialEq,
-    D: Ord + Clone + Derow<'a, Target: PartialEq> + PartialEq,
+    E: Ord + Clone + PartialEq,
+    D: Ord + Clone + PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         self.left.eq(&other.left)
     }
 }
-impl<'a, E,D> Eq for Oder<'a, E, D>
+impl<E,D> Eq for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a, Target: Eq> + Eq,
-    D: Ord + Clone + Derow<'a, Target: Eq> + Eq,
+    E: Ord + Clone + Eq,
+    D: Ord + Clone + Eq,
 {
 }
 
-impl<'a, E,D> PartialOrd<Self> for Oder<'a, E, D>
+impl<E,D> PartialOrd<Self> for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a, Target: PartialOrd + Eq> + PartialOrd,
-    D: Ord + Clone + Derow<'a, Target: PartialOrd + Eq> + PartialOrd,
+    E: Ord + Clone + PartialOrd,
+    D: Ord + Clone + PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.left.partial_cmp(&other.left)
@@ -116,10 +111,10 @@ where
     
 }
 
-impl<'a, E,D> Ord for Oder<'a, E, D>
+impl<E,D> Ord for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'a, Target: Ord> + Ord,
-    D: Ord + Clone + Derow<'a, Target: Ord> + Ord,
+    E: Ord + Clone + Ord,
+    D: Ord + Clone + Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.left.cmp(&other.left)
@@ -127,10 +122,10 @@ where
 }
 
 
-impl<'de, E, D> Deserialize<'de> for Oder<'de, E, D>
+impl<'de, E, D> Deserialize<'de> for Oder<E, D>
 where
-    E: Ord + Clone + Derow<'de> +Deserialize<'de> + 'de,
-    D: Ord + Clone + Derow<'de> +Deserialize<'de> + 'de,
+    E: Ord + Clone + 'de,
+    D: Ord + Clone + 'de,
 {
     fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
     where
@@ -141,7 +136,7 @@ where
             _d: PhantomData<D>,
         }
 
-        impl<'a, E,D> Visitoder<E, D> {
+        impl<E,D> Visitoder<E, D> {
             fn new() -> Self {
                 Self {
                     _e: PhantomData,
@@ -152,10 +147,10 @@ where
 
         impl<'de, E, D> Visitor<'de> for Visitoder<E, D>
         where
-            E: Ord + Clone + Derow<'de> +Deserialize<'de> + 'de,
-            D: Ord + Clone + Derow<'de> +Deserialize<'de> + 'de,
+            E: Ord + Clone + 'de,
+            D: Ord + Clone + 'de,
         {
-            type Value = Oder<'de, E, D>;
+            type Value = Oder<E, D>;
 
             fn expecting(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "Oder left or right are malformed")
