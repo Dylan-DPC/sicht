@@ -1,10 +1,11 @@
 #![deny(rust_2018_idioms)]
 #![deny(clippy::pedantic, clippy::dbg_macro)]
 #![feature(allocator_api)]
+pub mod diplopie;
 pub mod iter;
 pub mod map;
-pub mod selector;
 
+pub use crate::diplopie::Diplopie;
 pub use crate::map::SichtMap;
 
 #[cfg(test)]

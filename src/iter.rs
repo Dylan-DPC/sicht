@@ -1,7 +1,7 @@
-use crate::{selector::Oder, SichtMap};
+use crate::SichtMap;
+use kuh::Derow;
 use std::alloc::Allocator;
 use std::collections::btree_map::Iter;
-use kuh::Derow;
 
 impl<'a, K, O, V, A> IntoIterator for &'a SichtMap<K, O, V, A>
 where
@@ -10,8 +10,8 @@ where
     V: 'a,
     A: Allocator + Clone,
 {
-    type Item = (&'a Oder<K, O>, &'a V);
-    type IntoIter = Iter<'a, Oder<K, O>, V>;
+    type Item = (&'a K, &'a V);
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()

@@ -1,10 +1,9 @@
-use crate::selector::Oder;
-use serde::{Deserialize, Deserializer};
+use crate::Diplopie;
+use serde::{de::Visitor, Deserialize, Deserializer};
 use std::alloc::{Allocator, Global};
 use std::collections::{btree_map::Iter, BTreeMap};
-use std::borrow::Borrow;
 use std::fmt::{Debug, Formatter};
-use kuh::Derow;
+use std::marker::PhantomData;
 
 pub struct SichtMap<K, O, V, A = Global>
 where
@@ -12,100 +11,60 @@ where
     O: Ord + Clone,
     A: Allocator + Clone,
 {
-    pub(crate) map: BTreeMap<Oder<K, O>, V, A>,
+    pub(crate) map: BTreeMap<K, V, A>,
+    lookup: Diplopie<K, O>,
 }
 
-impl<'a, K, O, V> SichtMap<K, O, V>
+impl<K, O, V> SichtMap<K, O, V>
 where
     K: Ord + Clone,
     O: Ord + Clone,
 {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             map: BTreeMap::new(),
+            lookup: Diplopie::default(),
         }
+    }
+
+    #[must_use]
+    pub fn with_fields(map: BTreeMap<K, V>, lookup: Diplopie<K, O>) -> Self {
+        Self { map, lookup }
     }
 }
 
-impl<'a, K, O, V, A> SichtMap<K, O, V, A>
+impl<K, O, V, A> SichtMap<K, O, V, A>
 where
     K: Ord + Clone,
     O: Ord + Clone,
 
     A: Allocator + Clone,
 {
-    pub fn get_with_base_key<L>(&self, key: &L) -> Option<&V> 
-        where
-            K: Derow<'a, Target = L>, 
-            L: PartialEq<L> + PartialEq<K> + ?Sized,
-    {
-        self.map
-            .iter()
-            .find(|(Oder { left: l, right: _ }, _)| matches!(l, Some(k) if key == k))
-            .map(|(_, v)| v)
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.get_with_base_key(key)
     }
 
-    pub fn get_with_outer_key<P>(&self, key: &P) -> Option<&V> 
-        where
-            O: Derow<'a, Target = P>,
-            P: PartialEq<P> + PartialEq<O> + ?Sized,
-    {
-        self.map.iter().find(|(Oder { left: _, right: r}, _)| {
-            matches!(r, Some(k) if key == k)
-        }).map(|(_, v)| v)
+    pub fn get_with_base_key(&self, key: &K) -> Option<&V> {
+        self.map.get(key)
     }
 
-    pub fn get_with_outer_key_mut<P: AsRef<O>>(&mut self, key: &P) -> Option<&mut V> 
-    
-        where
-            O: Derow<'a, Target = P>,
-            P: PartialEq<P> + PartialEq<O>,
-    {
-        self.map
-            .iter_mut()
-            .find(
-                |(Oder { left: _, right: r }, _)| matches!(r, Some(k) if k == key.as_ref())
-            )
-            .map(|(_, v)| v)
+    pub fn get_with_outer_key(&self, key: &O) -> Option<&V> {
+        let base_key = self.lookup.get_urbild(key)?;
+        self.get_with_base_key(base_key)
     }
 
-    pub fn get_with_both_keys(&mut self, key: &K, other: &O) -> Option<&V> {
-        let oder = Oder::new(key.to_owned(), other.to_owned());
-        let result = self.map.get(&oder);
-        result
-
+    pub fn insert_with_both_keys(&mut self, key: K, cokey: O, value: V) {
+        self.lookup.insert(key.clone(), cokey);
+        self.map.insert(key, value);
     }
 
-    pub fn get_with_both_keys_mut(&mut self, key: &Oder<K, O>) -> Option<&mut V> {
-        self.map.get_mut(key)
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.map.contains_key(key)
     }
-    
-    pub fn insert_with_both_keys (&mut self, key: K, cokey: O, value: V) 
-    {
-        self.map.insert(Oder::new(key, cokey), value);
-    }
-
-    pub fn insert_with_cokey(&mut self, cokey: O, value: V) 
-        where
-    {
-        self.map.insert(Oder::new_right(cokey), value);
-    }
-
-    pub fn contains_both_keys<L, P>(&self, key: &K, cokey: &O) -> bool 
-        where
-            K: Borrow<L>,
-            O: Borrow<P>,
-    {
-        let oder = Oder::new(key.to_owned(), cokey.to_owned());
-        self.map.contains_key(&oder)
-
-    }
-    
-
 
     #[allow(clippy::iter_without_into_iter)]
-    pub fn iter(&self) -> Iter<'_, Oder<K, O>, V> {
+    pub fn iter(&self) -> Iter<'_, K, V> {
         self.map.iter()
     }
 
@@ -114,7 +73,7 @@ where
     }
 }
 
-impl<'a, K, O, V, A> Debug for SichtMap<K, O, V, A>
+impl<K, O, V, A> Debug for SichtMap<K, O, V, A>
 where
     K: Ord + Debug + Clone,
     O: Ord + Debug + Clone,
@@ -126,19 +85,21 @@ where
     }
 }
 
-impl<'a, K, O, V, A> Clone for SichtMap<K, O, V, A>
+impl<K, O, V, A> Clone for SichtMap<K, O, V, A>
 where
     K: Ord + Clone,
     O: Ord + Clone,
     V: Clone,
-    Oder<K, O>: Clone,
     A: Allocator + Clone,
 {
     fn clone(&self) -> Self {
-        Self { map: self.map.clone() }
+        Self {
+            map: self.map.clone(),
+            lookup: self.lookup.clone(),
+        }
     }
 }
-impl<'a, K, O, V> Default for SichtMap<K, O, V>
+impl<K, O, V> Default for SichtMap<K, O, V>
 where
     K: Ord + Clone + Default,
     O: Ord + Clone + Default,
@@ -158,21 +119,55 @@ where
     where
         D: Deserializer<'de>,
     {
-        let map: BTreeMap<Oder<K, O>, V> = BTreeMap::deserialize(deserializer)?;
-        Ok(Self { map })
+        struct MapVisitor<K, O, V> {
+            map: PhantomData<(K, O, V)>,
+            _lookup: (),
+        }
+
+        impl<K, O, V> MapVisitor<K, O, V> {
+            fn new() -> Self {
+                Self {
+                    map: PhantomData,
+                    _lookup: (),
+                }
+            }
+        }
+
+        impl<K, O, V> Visitor<'_> for MapVisitor<K, O, V>
+        where
+            K: Clone + Ord,
+            O: Clone + Ord,
+        {
+            type Value = SichtMap<K, O, V>;
+
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
+                write!(formatter, "Oder left or right are malformed")
+            }
+        }
+
+        deserializer.deserialize_struct("Carriage", &["map", "lookup"], MapVisitor::new())
     }
 }
 
-impl<'a, K, O, V> FromIterator<(Oder<K, O>, V)> for SichtMap<K, O, V> 
+impl<K, O, V> FromIterator<(K, O, V)> for SichtMap<K, O, V>
 where
     K: Ord + Clone,
     O: Ord + Clone,
 {
-    fn from_iter<T>(iter: T) -> Self 
-        where
-            T: IntoIterator<Item = (Oder<K, O>, V)> {
-                Self {
-                    map: BTreeMap::from_iter(iter)
-                }
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (K, O, V)>,
+    {
+        let (map, lookup) = iter.into_iter().fold(
+            (BTreeMap::<K, V>::default(), Diplopie::default()),
+            |(mut map, mut lookup), (key, cokey, item)| {
+                lookup.insert(key.clone(), cokey);
+                map.insert(key, item);
+
+                (map, lookup)
+            },
+        );
+
+        Self::with_fields(map, lookup)
     }
-    }
+}
