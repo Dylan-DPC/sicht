@@ -49,6 +49,19 @@ where
     pub fn iter(&self) -> Iter<'_, K, O> {
         self.bild.iter()
     }
+
+    pub fn generate_from_iter(iter: impl Iterator<Item = (K, O)>) -> Self {
+        let (bild, urbild) = iter.fold(
+            (BTreeMap::default(), BTreeMap::default()),
+            |(mut bild, mut urbild), (item, coitem)| {
+                bild.insert(item.clone(), coitem.clone());
+                urbild.insert(coitem, item);
+                (bild, urbild)
+            },
+        );
+
+        Self { bild, urbild }
+    }
 }
 
 impl<K, O> Debug for Diplopie<K, O>
@@ -71,5 +84,30 @@ where
             bild: BTreeMap::default(),
             urbild: BTreeMap::default(),
         }
+    }
+}
+
+impl<K, O> FromIterator<(K, O)> for Diplopie<K, O>
+where
+    K: Ord + Clone,
+    O: Ord + Clone,
+{
+    fn from_iter<I: IntoIterator<Item = (K, O)>>(iter: I) -> Self {
+        Self::generate_from_iter(iter.into_iter())
+    }
+}
+
+impl<K, O> Extend<(K, O)> for Diplopie<K, O>
+where
+    K: Ord + Clone,
+    O: Ord + Clone,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = (K, O)>,
+    {
+        iter.into_iter().for_each(move |(k, v)| {
+            self.insert(k, v);
+        });
     }
 }
