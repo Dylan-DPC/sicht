@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 
 /// Named after <https://en.wikipedia.org/wiki/Diplopia>
+///
 /// Also see <https://www.warbyparker.com/learn/od-vs-os>
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diplopia<K, V>
@@ -27,6 +28,7 @@ where
         Self { od: map, os }
     }
 
+    #[inline]
     pub fn get<Q>(&self, key: &K) -> Option<&V>
     where
         K: Borrow<Q>,

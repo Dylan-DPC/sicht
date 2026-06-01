@@ -3,7 +3,7 @@
 #![allow(clippy::pedantic)]
 
 pub mod diplopia;
-pub mod iter;
+mod iter;
 pub mod map;
 
 #[cfg(feature = "serde")]
