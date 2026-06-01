@@ -9,7 +9,7 @@ impl<'de, K, O, V> Deserialize<'de> for SichtMap<K, O, V>
 where
     K: Deserialize<'de> + Ord + Clone + 'de,
     O: Deserialize<'de> + Ord + Clone + 'de,
-    V: Deserialize<'de>,
+    V: Deserialize<'de> + Ord,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -33,6 +33,7 @@ where
         where
             K: Clone + Ord,
             O: Clone + Ord,
+            V: Ord,
         {
             type Value = SichtMap<K, O, V>;
 

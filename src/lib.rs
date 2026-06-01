@@ -1,21 +1,13 @@
 #![deny(rust_2018_idioms)]
-#![deny(clippy::pedantic, clippy::dbg_macro)]
-#![feature(allocator_api)]
-pub mod diplopie;
+// #![deny(missing_docs)]
+#![allow(clippy::pedantic)]
+
+pub mod diplopia;
 pub mod iter;
 pub mod map;
+
+#[cfg(feature = "serde")]
 pub mod serde;
 
-pub use crate::diplopie::Diplopie;
+pub use crate::diplopia::Diplopia;
 pub use crate::map::SichtMap;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}

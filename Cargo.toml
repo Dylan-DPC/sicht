@@ -3,6 +3,9 @@ name = "sicht"
 version = "0.1.0"
 edition = "2021"
 
+[feature]
+serde = ["dep:serde", "dep:serde_derive"]
+
 [dependencies]
-serde = { version = "1.0.217", features = ["derive"] }
-serde_derive = "1.0.217"
+serde = { optional = true, version = "1.0.217", features = ["derive"] }
+serde_derive = { optional = true, version = "1.0.217" }
