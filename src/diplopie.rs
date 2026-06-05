@@ -9,53 +9,53 @@ use std::fmt::{Debug, Formatter};
 ///
 /// Also see <https://www.warbyparker.com/learn/od-vs-os>
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Diplopie<K, V>
+pub struct Diplopie<K, O>
 where
     K: Ord + Clone,
-    V: Ord + Clone,
+    O: Ord + Clone,
 {
-    od: BTreeMap<K, V>,
-    os: BTreeMap<V, K>,
+    od: BTreeMap<K, O>,
+    os: BTreeMap<O, K>,
 }
 
-impl<K, V> Diplopie<K, V>
+impl<K, O> Diplopie<K, O>
 where
     K: Ord + Clone,
-    V: Ord + Clone,
+    O: Ord + Clone,
 {
     #[must_use]
-    pub fn init(map: BTreeMap<K, V>) -> Self {
+    pub fn init(map: BTreeMap<K, O>) -> Self {
         let os = map.iter().map(|(k, v)| (v.clone(), k.clone())).collect();
         Self { od: map, os }
     }
 
     #[inline]
-    pub fn get<Q>(&self, key: &K) -> Option<&V>
+    pub fn get<Q>(&self, key: &K) -> Option<&O>
     where
         K: Borrow<Q>,
     {
         self.get_od(key)
     }
 
-    pub fn get_od(&self, key: &K) -> Option<&V> {
+    pub fn get_od(&self, key: &K) -> Option<&O> {
         self.od.get(key)
     }
 
-    pub fn get_os(&self, value: &V) -> Option<&K> {
+    pub fn get_os(&self, value: &O) -> Option<&K> {
         self.os.get(value)
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: K, value: O) {
         self.od.insert(key.clone(), value.clone());
         self.os.insert(value, key);
     }
 
     #[allow(clippy::iter_without_into_iter)]
-    pub fn iter(&self) -> Iter<'_, K, V> {
+    pub fn iter(&self) -> Iter<'_, K, O> {
         self.od.iter()
     }
 
-    pub fn generate_from_iter(iter: impl Iterator<Item = (K, V)>) -> Self {
+    pub fn generate_from_iter(iter: impl Iterator<Item = (K, O)>) -> Self {
         let (od, os) = iter.fold(
             (BTreeMap::default(), BTreeMap::default()),
             |(mut normal, mut reverse), (item, coitem)| {
