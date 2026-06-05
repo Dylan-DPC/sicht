@@ -3,9 +3,10 @@ name = "sicht"
 version = "0.1.0"
 edition = "2021"
 
-[feature]
+[features]
 serde = ["dep:serde", "dep:serde_derive"]
 
 [dependencies]
 serde = { optional = true, version = "1.0.217", features = ["derive"] }
 serde_derive = { optional = true, version = "1.0.217" }
+slotmap = "1.1.1"

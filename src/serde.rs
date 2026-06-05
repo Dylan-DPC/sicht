@@ -121,7 +121,7 @@ pub trait Pair {
 pub struct Error {}
 
 impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         todo!()
     }
 }
@@ -129,7 +129,7 @@ impl Display for Error {
 impl std::error::Error for Error {}
 
 impl serde::de::Error for Error {
-    fn custom<T>(msg: T) -> Self
+    fn custom<T>(_msg: T) -> Self
     where
         T: Display,
     {

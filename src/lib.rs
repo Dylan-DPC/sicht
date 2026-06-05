@@ -2,6 +2,7 @@
 // #![deny(missing_docs)]
 #![allow(clippy::pedantic)]
 
+pub mod birelational_map;
 pub mod diplopia;
 mod iter;
 pub mod map;
