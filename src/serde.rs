@@ -9,7 +9,7 @@ impl<'de, K, O, V> Deserialize<'de> for SichtMap<K, O, V>
 where
     K: Deserialize<'de> + Ord + Clone + 'de,
     O: Deserialize<'de> + Ord + Clone + 'de,
-    V: Deserialize<'de>,
+    V: Deserialize<'de> + Ord,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -33,6 +33,7 @@ where
         where
             K: Clone + Ord,
             O: Clone + Ord,
+            V: Ord,
         {
             type Value = SichtMap<K, O, V>;
 
@@ -120,7 +121,7 @@ pub trait Pair {
 pub struct Error {}
 
 impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         todo!()
     }
 }
@@ -128,7 +129,7 @@ impl Display for Error {
 impl std::error::Error for Error {}
 
 impl serde::de::Error for Error {
-    fn custom<T>(msg: T) -> Self
+    fn custom<T>(_msg: T) -> Self
     where
         T: Display,
     {

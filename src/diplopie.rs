@@ -4,14 +4,18 @@ use std::collections::btree_map::Iter;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 
+/// Named after <https://en.wikipedia.org/wiki/Diplopia>
+/// An instance of Diplopia
+///
+/// Also see <https://www.warbyparker.com/learn/od-vs-os>
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diplopie<K, O>
 where
     K: Ord + Clone,
     O: Ord + Clone,
 {
-    bild: BTreeMap<K, O>,
-    urbild: BTreeMap<O, K>,
+    od: BTreeMap<K, O>,
+    os: BTreeMap<O, K>,
 }
 
 impl<K, O> Diplopie<K, O>
@@ -21,90 +25,91 @@ where
 {
     #[must_use]
     pub fn init(map: BTreeMap<K, O>) -> Self {
-        let urbild = map.iter().map(|(k, o)| (o.clone(), k.clone())).collect();
-        Self { bild: map, urbild }
+        let os = map.iter().map(|(k, v)| (v.clone(), k.clone())).collect();
+        Self { od: map, os }
     }
 
+    #[inline]
     pub fn get<Q>(&self, key: &K) -> Option<&O>
     where
         K: Borrow<Q>,
     {
-        self.get_bild(key)
+        self.get_od(key)
     }
 
-    pub fn get_bild(&self, bild: &K) -> Option<&O> {
-        self.bild.get(bild)
+    pub fn get_od(&self, key: &K) -> Option<&O> {
+        self.od.get(key)
     }
 
-    pub fn get_urbild(&self, urbild: &O) -> Option<&K> {
-        self.urbild.get(urbild)
+    pub fn get_os(&self, value: &O) -> Option<&K> {
+        self.os.get(value)
     }
 
-    pub fn insert(&mut self, bild: K, urbild: O) {
-        self.bild.insert(bild.clone(), urbild.clone());
-        self.urbild.insert(urbild, bild);
+    pub fn insert(&mut self, key: K, value: O) {
+        self.od.insert(key.clone(), value.clone());
+        self.os.insert(value, key);
     }
 
     #[allow(clippy::iter_without_into_iter)]
     pub fn iter(&self) -> Iter<'_, K, O> {
-        self.bild.iter()
+        self.od.iter()
     }
 
     pub fn generate_from_iter(iter: impl Iterator<Item = (K, O)>) -> Self {
-        let (bild, urbild) = iter.fold(
+        let (od, os) = iter.fold(
             (BTreeMap::default(), BTreeMap::default()),
-            |(mut bild, mut urbild), (item, coitem)| {
-                bild.insert(item.clone(), coitem.clone());
-                urbild.insert(coitem, item);
-                (bild, urbild)
+            |(mut normal, mut reverse), (item, coitem)| {
+                normal.insert(item.clone(), coitem.clone());
+                reverse.insert(coitem, item);
+                (normal, reverse)
             },
         );
 
-        Self { bild, urbild }
+        Self { od, os }
     }
 }
 
-impl<K, O> Debug for Diplopie<K, O>
+impl<K, V> Debug for Diplopie<K, V>
 where
     K: Ord + Clone + Debug,
-    O: Ord + Clone + Debug,
+    V: Ord + Clone + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_map().entries(self.iter()).finish()
     }
 }
 
-impl<K, O> Default for Diplopie<K, O>
+impl<K, V> Default for Diplopie<K, V>
 where
     K: Ord + Clone,
-    O: Ord + Clone,
+    V: Ord + Clone,
 {
     fn default() -> Self {
         Self {
-            bild: BTreeMap::default(),
-            urbild: BTreeMap::default(),
+            od: BTreeMap::default(),
+            os: BTreeMap::default(),
         }
     }
 }
 
-impl<K, O> FromIterator<(K, O)> for Diplopie<K, O>
+impl<K, V> FromIterator<(K, V)> for Diplopie<K, V>
 where
     K: Ord + Clone,
-    O: Ord + Clone,
+    V: Ord + Clone,
 {
-    fn from_iter<I: IntoIterator<Item = (K, O)>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
         Self::generate_from_iter(iter.into_iter())
     }
 }
 
-impl<K, O> Extend<(K, O)> for Diplopie<K, O>
+impl<K, V> Extend<(K, V)> for Diplopie<K, V>
 where
     K: Ord + Clone,
-    O: Ord + Clone,
+    V: Ord + Clone,
 {
     fn extend<I>(&mut self, iter: I)
     where
-        I: IntoIterator<Item = (K, O)>,
+        I: IntoIterator<Item = (K, V)>,
     {
         iter.into_iter().for_each(move |(k, v)| {
             self.insert(k, v);
