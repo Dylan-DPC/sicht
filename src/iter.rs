@@ -1,4 +1,4 @@
-use crate::{Diplopia, SichtMap};
+use crate::{Diplopie, SichtMap};
 use std::collections::btree_map::{BTreeMap, Iter};
 
 impl<'a, K, O, V> IntoIterator for &'a SichtMap<K, O, V>
@@ -35,7 +35,7 @@ where
     V: Ord,
 {
     fn from_iter<I: IntoIterator<Item = ((K, V), (K, O))>>(iter: I) -> Self {
-        let (map, lookup): (BTreeMap<K, V>, Diplopia<K, O>) = iter.into_iter().unzip();
+        let (map, lookup): (BTreeMap<K, V>, Diplopie<K, O>) = iter.into_iter().unzip();
         Self::with_fields(map, lookup)
     }
 }

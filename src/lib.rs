@@ -3,12 +3,12 @@
 #![allow(clippy::pedantic)]
 
 pub mod birelational_map;
-pub mod diplopia;
+pub mod diplopie;
 mod iter;
 pub mod map;
 
 #[cfg(feature = "serde")]
 pub mod serde;
 
-pub use crate::diplopia::Diplopia;
+pub use crate::diplopie::Diplopie;
 pub use crate::map::SichtMap;

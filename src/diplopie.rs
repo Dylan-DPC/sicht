@@ -5,10 +5,11 @@ use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 
 /// Named after <https://en.wikipedia.org/wiki/Diplopia>
+/// An instance of Diplopia
 ///
 /// Also see <https://www.warbyparker.com/learn/od-vs-os>
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Diplopia<K, V>
+pub struct Diplopie<K, V>
 where
     K: Ord + Clone,
     V: Ord + Clone,
@@ -17,7 +18,7 @@ where
     os: BTreeMap<V, K>,
 }
 
-impl<K, V> Diplopia<K, V>
+impl<K, V> Diplopie<K, V>
 where
     K: Ord + Clone,
     V: Ord + Clone,
@@ -68,7 +69,7 @@ where
     }
 }
 
-impl<K, V> Debug for Diplopia<K, V>
+impl<K, V> Debug for Diplopie<K, V>
 where
     K: Ord + Clone + Debug,
     V: Ord + Clone + Debug,
@@ -78,7 +79,7 @@ where
     }
 }
 
-impl<K, V> Default for Diplopia<K, V>
+impl<K, V> Default for Diplopie<K, V>
 where
     K: Ord + Clone,
     V: Ord + Clone,
@@ -91,7 +92,7 @@ where
     }
 }
 
-impl<K, V> FromIterator<(K, V)> for Diplopia<K, V>
+impl<K, V> FromIterator<(K, V)> for Diplopie<K, V>
 where
     K: Ord + Clone,
     V: Ord + Clone,
@@ -101,7 +102,7 @@ where
     }
 }
 
-impl<K, V> Extend<(K, V)> for Diplopia<K, V>
+impl<K, V> Extend<(K, V)> for Diplopie<K, V>
 where
     K: Ord + Clone,
     V: Ord + Clone,

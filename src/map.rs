@@ -1,4 +1,4 @@
-use crate::Diplopia;
+use crate::Diplopie;
 use std::collections::{btree_map::Iter, BTreeMap};
 use std::fmt::{Debug, Formatter};
 
@@ -9,7 +9,7 @@ where
     V: Ord,
 {
     pub(crate) map: BTreeMap<K, V>,
-    lookup: Diplopia<K, O>,
+    lookup: Diplopie<K, O>,
 }
 
 impl<K, O, V> SichtMap<K, O, V>
@@ -22,12 +22,12 @@ where
     pub fn new() -> Self {
         Self {
             map: BTreeMap::new(),
-            lookup: Diplopia::default(),
+            lookup: Diplopie::default(),
         }
     }
 
     #[must_use]
-    pub fn with_fields(map: BTreeMap<K, V>, lookup: Diplopia<K, O>) -> Self {
+    pub fn with_fields(map: BTreeMap<K, V>, lookup: Diplopie<K, O>) -> Self {
         Self { map, lookup }
     }
 }
