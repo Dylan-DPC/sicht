@@ -28,13 +28,7 @@ where
     pub fn with_fields(map: BTreeMap<K, V>, lookup: Diplopie<K, O>) -> Self {
         Self { map, lookup }
     }
-}
 
-impl<K, O, V> SichtMap<K, O, V>
-where
-    K: Ord + Clone,
-    O: Ord + Clone,
-{
     pub fn get(&self, key: &K) -> Option<&V> {
         self.get_with_base_key(key)
     }
@@ -48,6 +42,10 @@ where
         self.get_with_base_key(base_key)
     }
 
+    pub fn insert(&mut self, key: K, cokey: O, value: V) {
+        self.insert_with_both_keys(key, cokey, value);
+    }
+
     pub fn insert_with_both_keys(&mut self, key: K, cokey: O, value: V) {
         self.lookup.insert(key.clone(), cokey);
         self.map.insert(key, value);
@@ -55,6 +53,16 @@ where
 
     pub fn contains_key(&self, key: &K) -> bool {
         self.map.contains_key(key)
+    }
+
+    #[must_use]
+    pub fn lookup(&self) -> &Diplopie<K, O> {
+        &self.lookup
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 
     #[allow(clippy::iter_without_into_iter)]
@@ -99,5 +107,22 @@ where
 {
     fn default() -> Self {
         SichtMap::new()
+    }
+}
+pub trait RetrieveCokey {
+    type Key: Ord + Clone;
+    type Cokey: Ord + Clone;
+    fn retrieve_cokey(&self, key: &Self::Key) -> Option<&Self::Cokey>;
+}
+impl<K, O, V> RetrieveCokey for SichtMap<K, O, V>
+where
+    K: Ord + Clone,
+    O: Ord + Clone,
+    V: RetrieveCokey<Key = K, Cokey = O>,
+{
+    type Key = K;
+    type Cokey = O;
+    fn retrieve_cokey(&self, key: &K) -> Option<&<V as RetrieveCokey>::Cokey> {
+        self.get(key)?.retrieve_cokey(key)
     }
 }

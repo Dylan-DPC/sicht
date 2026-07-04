@@ -1,9 +1,28 @@
 use crate::SichtMap;
 use serde::de::{DeserializeSeed, Deserializer, IntoDeserializer, MapAccess, Visitor};
-use serde::Deserialize;
+use serde::ser::{SerializeMap, Serializer};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::iter::Fuse;
 use std::marker::PhantomData;
+
+impl<K, O, V> Serialize for SichtMap<K, O, V>
+where
+    K: Serialize + Ord + Clone,
+    O: Serialize + Ord + Clone,
+    V: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.len()))?;
+        for (k, v) in self {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
+    }
+}
 
 impl<'de, K, O, V> Deserialize<'de> for SichtMap<K, O, V>
 where
@@ -29,15 +48,28 @@ where
             }
         }
 
-        impl<K, O, V> Visitor<'_> for MapVisitor<K, O, V>
+        impl<'d, K, O, V> Visitor<'d> for MapVisitor<K, O, V>
         where
-            K: Clone + Ord,
-            O: Clone + Ord,
+            K: Clone + Ord + Deserialize<'d>,
+            O: Clone + Ord + Deserialize<'d>,
+            V: Deserialize<'d>,
         {
             type Value = SichtMap<K, O, V>;
 
             fn expecting(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "Oder left or right are malformed")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'d>,
+            {
+                let mut sicht = SichtMap::default();
+                while let Some(((key, cokey), value)) = map.next_entry()? {
+                    sicht.insert_with_both_keys(key, cokey, value);
+                }
+
+                Ok(sicht)
             }
         }
 
